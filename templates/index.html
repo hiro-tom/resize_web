@@ -12,7 +12,10 @@
             <h1>画像圧縮WEBアプリ</h1>
             <p class="subtitle">圧縮率・サイズ・DPIを指定してダウンロードできます。</p>
         </div>
-        <a class="ghost" href="{{ url_for('logout') }}">ログアウト</a>
+        <div class="topbar-actions">
+            <a class="ghost" href="{{ url_for('settings') }}">設定</a>
+            <a class="ghost" href="{{ url_for('logout') }}">ログアウト</a>
+        </div>
     </header>
 
     <main class="container">

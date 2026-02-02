@@ -1,4 +1,5 @@
 import io
+import json
 import os
 from datetime import timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
@@ -12,6 +13,26 @@ DEFAULT_PASSWORD = os.getenv("APP_PASSWORD", "password")
 app = Flask(__name__)
 app.secret_key = os.getenv("APP_SECRET_KEY", "change-me")
 app.permanent_session_lifetime = timedelta(hours=4)
+os.makedirs(app.instance_path, exist_ok=True)
+CREDENTIALS_PATH = os.path.join(app.instance_path, "credentials.json")
+
+
+def load_credentials() -> dict:
+    if os.path.exists(CREDENTIALS_PATH):
+        try:
+            with open(CREDENTIALS_PATH, "r", encoding="utf-8") as file:
+                data = json.load(file)
+                username = data.get("username") or DEFAULT_USERNAME
+                password = data.get("password") or DEFAULT_PASSWORD
+                return {"username": username, "password": password}
+        except Exception:
+            pass
+    return {"username": DEFAULT_USERNAME, "password": DEFAULT_PASSWORD}
+
+
+def save_credentials(username: str, password: str) -> None:
+    with open(CREDENTIALS_PATH, "w", encoding="utf-8") as file:
+        json.dump({"username": username, "password": password}, file, ensure_ascii=False)
 
 
 def allowed_file(filename: str) -> bool:
@@ -34,7 +55,8 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        if username == DEFAULT_USERNAME and password == DEFAULT_PASSWORD:
+        credentials = load_credentials()
+        if username == credentials["username"] and password == credentials["password"]:
             session.permanent = True
             session["logged_in"] = True
             return redirect(url_for("index"))
@@ -46,6 +68,34 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+@app.route("/settings", methods=["GET", "POST"])
+@login_required
+def settings():
+    credentials = load_credentials()
+    if request.method == "POST":
+        current_password = request.form.get("current_password", "").strip()
+        new_password = request.form.get("new_password", "").strip()
+        confirm_password = request.form.get("confirm_password", "").strip()
+
+        if current_password != credentials["password"]:
+            flash("現在のパスワードが正しくありません。", "error")
+            return redirect(url_for("settings"))
+
+        if not new_password:
+            flash("新しいパスワードを入力してください。", "error")
+            return redirect(url_for("settings"))
+
+        if new_password != confirm_password:
+            flash("新しいパスワードが一致しません。", "error")
+            return redirect(url_for("settings"))
+
+        save_credentials(credentials["username"], new_password)
+        flash("パスワードを更新しました。", "success")
+        return redirect(url_for("settings"))
+
+    return render_template("settings.html", username=credentials["username"])
 
 
 @app.route("/", methods=["GET", "POST"])

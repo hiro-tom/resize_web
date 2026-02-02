@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>設定 | 画像圧縮アプリ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div>
+            <h1>設定</h1>
+            <p class="subtitle">ログインパスワードを変更できます。</p>
+        </div>
+        <div class="topbar-actions">
+            <a class="ghost" href="{{ url_for('index') }}">戻る</a>
+            <a class="ghost" href="{{ url_for('logout') }}">ログアウト</a>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="card">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-list">
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="info-row">
+                <span class="info-label">ID</span>
+                <span class="info-value">{{ username }}</span>
+            </div>
+
+            <form method="post" class="form">
+                <label>
+                    現在のパスワード
+                    <input type="password" name="current_password" required>
+                </label>
+                <label>
+                    新しいパスワード
+                    <input type="password" name="new_password" required>
+                </label>
+                <label>
+                    新しいパスワード（確認）
+                    <input type="password" name="confirm_password" required>
+                </label>
+                <button type="submit" class="primary">更新</button>
+            </form>
+        </div>
+    </main>
+</body>
+</html>
