@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン | 画像圧縮アプリ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="auth-body">
+    <div class="card auth-card">
+        <h1>ログイン</h1>
+        <p class="subtitle">IDとパスワードを入力してください。</p>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-list">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        <form method="post" class="form">
+            <label>
+                ID
+                <input type="text" name="username" required>
+            </label>
+            <label>
+                パスワード
+                <input type="password" name="password" required>
+            </label>
+            <button type="submit" class="primary">ログイン</button>
+        </form>
+    </div>
+</body>
+</html>

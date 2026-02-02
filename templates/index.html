@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像圧縮アプリ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div>
+            <h1>画像圧縮WEBアプリ</h1>
+            <p class="subtitle">圧縮率・サイズ・DPIを指定してダウンロードできます。</p>
+        </div>
+        <a class="ghost" href="{{ url_for('logout') }}">ログアウト</a>
+    </header>
+
+    <main class="container">
+        <div class="card">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-list">
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="post" enctype="multipart/form-data" class="form">
+                <label class="dropzone" id="dropzone">
+                    <input type="file" name="image" id="imageInput" accept=".jpg,.jpeg,.png,.webp" required>
+                    <div class="dropzone-content">
+                        <span class="dropzone-title">ここにドラッグ＆ドロップ</span>
+                        <span class="dropzone-sub">またはクリックして選択</span>
+                        <span class="dropzone-filename" id="fileName">未選択</span>
+                    </div>
+                </label>
+
+                <div class="grid">
+                    <label>
+                        圧縮率 (10〜95)
+                        <input type="number" name="quality" min="10" max="95" value="80">
+                    </label>
+                    <label>
+                        横幅 (px)
+                        <input type="number" name="width" min="1" placeholder="未入力で保持">
+                    </label>
+                    <label>
+                        高さ (px)
+                        <input type="number" name="height" min="1" placeholder="未入力で保持">
+                    </label>
+                    <label>
+                        DPI
+                        <input type="number" name="dpi" min="1" placeholder="未入力で保持">
+                    </label>
+                    <label>
+                        出力形式
+                        <select name="output_format">
+                            <option value="jpeg">JPEG</option>
+                            <option value="png">PNG</option>
+                            <option value="webp">WebP</option>
+                        </select>
+                    </label>
+                </div>
+
+                <p class="hint">PNGをJPEGに変換する場合、透過部分は白で埋められます。</p>
+
+                <button type="submit" class="primary">変換してダウンロード</button>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        const dropzone = document.getElementById("dropzone");
+        const imageInput = document.getElementById("imageInput");
+        const fileName = document.getElementById("fileName");
+
+        const updateFileName = () => {
+            if (imageInput.files && imageInput.files.length > 0) {
+                fileName.textContent = imageInput.files[0].name;
+            } else {
+                fileName.textContent = "未選択";
+            }
+        };
+
+        imageInput.addEventListener("change", updateFileName);
+
+        dropzone.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            dropzone.classList.add("is-dragover");
+        });
+
+        dropzone.addEventListener("dragleave", () => {
+            dropzone.classList.remove("is-dragover");
+        });
+
+        dropzone.addEventListener("drop", (event) => {
+            event.preventDefault();
+            dropzone.classList.remove("is-dragover");
+
+            if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+                imageInput.files = event.dataTransfer.files;
+                updateFileName();
+            }
+        });
+    </script>
+</body>
+</html>
