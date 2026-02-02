@@ -3,7 +3,6 @@ import json
 import os
 from datetime import timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
-from werkzeug.utils import secure_filename
 from PIL import Image
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -111,7 +110,7 @@ def index():
             flash("対応していないファイル形式です。", "error")
             return redirect(url_for("index"))
 
-        filename = secure_filename(file.filename)
+        original_filename = file.filename
         try:
             image = Image.open(file.stream)
         except Exception:
@@ -174,7 +173,7 @@ def index():
         image.save(output, **save_kwargs)
         output.seek(0)
 
-        base_name, _ = os.path.splitext(filename)
+        base_name, _ = os.path.splitext(original_filename)
         download_name = f"{base_name}{extension}"
 
         return send_file(
