@@ -175,7 +175,7 @@ def index():
         output.seek(0)
 
         base_name, _ = os.path.splitext(filename)
-        download_name = f"{base_name}_compressed{extension}"
+        download_name = f"{base_name}{extension}"
 
         return send_file(
             output,
