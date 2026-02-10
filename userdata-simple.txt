@@ -1,0 +1,37 @@
+#!/bin/bash
+set -x
+exec > /tmp/deploy.log 2>&1
+
+yum update -y
+yum install -y python3 python3-pip git
+
+cd /opt
+rm -rf resize_web
+git clone https://github.com/hiro-tom/resize_web.git
+cd resize_web
+
+python3 -m pip install -r requirements.txt
+
+# systemdサービスを作成
+cat > /etc/systemd/system/resize-web.service << 'EOF'
+[Unit]
+Description=Resize Web App
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/resize_web
+ExecStart=/usr/bin/python3 app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# サービスを有効化して起動
+systemctl daemon-reload
+systemctl enable resize-web
+systemctl start resize-web
+
+echo "Deployment complete"
