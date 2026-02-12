@@ -155,6 +155,31 @@ input:focus, select:focus {
     word-break: break-all;
 }
 
+.dropzone-filename.file-over-limit {
+    color: #991b1b;
+    font-weight: 700;
+}
+
+.file-list {
+    list-style: none;
+    padding: 0;
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #475569;
+    text-align: left;
+    display: grid;
+    gap: 2px;
+}
+
+.file-list:empty {
+    display: none;
+}
+
+.file-list-more {
+    color: #6b7280;
+    font-style: italic;
+}
+
 .dropzone.is-dragover {
     border-color: #6366f1;
     background: #eef2ff;

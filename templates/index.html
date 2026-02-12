@@ -32,11 +32,12 @@
 
             <form method="post" enctype="multipart/form-data" class="form">
                 <label class="dropzone" id="dropzone">
-                    <input type="file" name="image" id="imageInput" accept=".jpg,.jpeg,.png,.webp" required>
+                    <input type="file" name="images" id="imageInput" accept=".jpg,.jpeg,.png,.webp" multiple required>
                     <div class="dropzone-content">
                         <span class="dropzone-title">ここにドラッグ＆ドロップ</span>
-                        <span class="dropzone-sub">またはクリックして選択</span>
+                        <span class="dropzone-sub">またはクリックして選択（最大100ファイル）</span>
                         <span class="dropzone-filename" id="fileName">未選択</span>
+                        <ul class="file-list" id="fileList"></ul>
                     </div>
                 </label>
 
@@ -48,10 +49,6 @@
                     <label>
                         横幅 (px)
                         <input type="number" name="width" min="1" placeholder="未入力で保持">
-                    </label>
-                    <label>
-                        高さ (px)
-                        <input type="number" name="height" min="1" placeholder="未入力で保持">
                     </label>
                     <label>
                         DPI
@@ -67,7 +64,7 @@
                     </label>
                 </div>
 
-                <p class="hint">PNGをJPEGに変換する場合、透過部分は白で埋められます。</p>
+                <p class="hint">横幅を指定すると縦は比率を保って自動調整されます。PNGをJPEGに変換する場合、透過部分は白で埋められます。</p>
 
                 <button type="submit" class="primary">変換してダウンロード</button>
             </form>
@@ -78,16 +75,45 @@
         const dropzone = document.getElementById("dropzone");
         const imageInput = document.getElementById("imageInput");
         const fileName = document.getElementById("fileName");
+        const fileList = document.getElementById("fileList");
+        const MAX_FILES = 100;
 
-        const updateFileName = () => {
-            if (imageInput.files && imageInput.files.length > 0) {
-                fileName.textContent = imageInput.files[0].name;
-            } else {
+        const updateFileInfo = () => {
+            const files = imageInput.files;
+            fileList.innerHTML = "";
+
+            if (!files || files.length === 0) {
                 fileName.textContent = "未選択";
+                return;
+            }
+
+            if (files.length === 1) {
+                fileName.textContent = files[0].name;
+            } else {
+                fileName.textContent = files.length + " ファイル選択中";
+                const show = Math.min(files.length, 10);
+                for (let i = 0; i < show; i++) {
+                    const li = document.createElement("li");
+                    li.textContent = files[i].name;
+                    fileList.appendChild(li);
+                }
+                if (files.length > 10) {
+                    const li = document.createElement("li");
+                    li.textContent = "… 他 " + (files.length - 10) + " ファイル";
+                    li.className = "file-list-more";
+                    fileList.appendChild(li);
+                }
+            }
+
+            if (files.length > MAX_FILES) {
+                fileName.textContent = "エラー: 最大" + MAX_FILES + "ファイルまでです（" + files.length + "件選択中）";
+                fileName.classList.add("file-over-limit");
+            } else {
+                fileName.classList.remove("file-over-limit");
             }
         };
 
-        imageInput.addEventListener("change", updateFileName);
+        imageInput.addEventListener("change", updateFileInfo);
 
         dropzone.addEventListener("dragover", (event) => {
             event.preventDefault();
@@ -104,7 +130,7 @@
 
             if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
                 imageInput.files = event.dataTransfer.files;
-                updateFileName();
+                updateFileInfo();
             }
         });
     </script>

@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import zipfile
 from datetime import timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 from PIL import Image
@@ -97,90 +98,135 @@ def settings():
     return render_template("settings.html", username=credentials["username"])
 
 
+MAX_FILES = 100
+
+
+def process_image(file_stream, quality, target_width, target_dpi, output_format):
+    """1枚の画像を処理してバイト列と拡張子を返す。"""
+    image = Image.open(file_stream)
+
+    if target_width:
+        orig_w, orig_h = image.size
+        ratio = target_width / orig_w
+        new_size = (target_width, int(orig_h * ratio))
+        image = image.resize(new_size, Image.LANCZOS)
+
+    if output_format in ("jpeg", "webp"):
+        if image.mode in ("RGBA", "P"):
+            image = image.convert("RGB")
+    elif output_format != "png":
+        output_format = "jpeg"
+        if image.mode in ("RGBA", "P"):
+            image = image.convert("RGB")
+
+    output = io.BytesIO()
+    save_kwargs = {}
+    if target_dpi:
+        save_kwargs["dpi"] = (target_dpi, target_dpi)
+
+    if output_format == "jpeg":
+        save_kwargs.update({"format": "JPEG", "quality": quality, "optimize": True})
+        extension = ".jpg"
+    elif output_format == "webp":
+        save_kwargs.update({"format": "WEBP", "quality": quality, "method": 6})
+        extension = ".webp"
+    else:
+        compress_level = int(round((100 - quality) / 100 * 9))
+        save_kwargs.update({"format": "PNG", "optimize": True, "compress_level": compress_level})
+        extension = ".png"
+
+    image.save(output, **save_kwargs)
+    output.seek(0)
+    return output, extension
+
+
 @app.route("/", methods=["GET", "POST"])
 @login_required
 def index():
     if request.method == "POST":
-        if "image" not in request.files:
+        files = request.files.getlist("images")
+        files = [f for f in files if f.filename]
+
+        if not files:
             flash("画像ファイルが選択されていません。", "error")
             return redirect(url_for("index"))
 
-        file = request.files["image"]
-        if file.filename == "" or not allowed_file(file.filename):
-            flash("対応していないファイル形式です。", "error")
-            return redirect(url_for("index"))
-
-        original_filename = file.filename
-        try:
-            image = Image.open(file.stream)
-        except Exception:
-            flash("画像の読み込みに失敗しました。", "error")
+        if len(files) > MAX_FILES:
+            flash(f"一度にアップロードできるのは最大{MAX_FILES}ファイルです。", "error")
             return redirect(url_for("index"))
 
         quality = int(request.form.get("quality", 80))
         quality = max(10, min(95, quality))
 
         width = request.form.get("width", "").strip()
-        height = request.form.get("height", "").strip()
         dpi = request.form.get("dpi", "").strip()
         output_format = request.form.get("output_format", "jpeg").lower()
 
         target_width = int(width) if width.isdigit() and int(width) > 0 else None
-        target_height = int(height) if height.isdigit() and int(height) > 0 else None
         target_dpi = int(dpi) if dpi.isdigit() and int(dpi) > 0 else None
 
-        if target_width or target_height:
-            orig_w, orig_h = image.size
-            if target_width and target_height:
-                new_size = (target_width, target_height)
-            elif target_width:
-                ratio = target_width / orig_w
-                new_size = (target_width, int(orig_h * ratio))
-            else:
-                ratio = target_height / orig_h
-                new_size = (int(orig_w * ratio), target_height)
-            image = image.resize(new_size, Image.LANCZOS)
+        # 各ファイルをバリデーション
+        for f in files:
+            if not allowed_file(f.filename):
+                flash(f"対応していないファイル形式です: {f.filename}", "error")
+                return redirect(url_for("index"))
 
-        if output_format == "jpeg":
-            if image.mode in ("RGBA", "P"):
-                image = image.convert("RGB")
-        elif output_format == "webp":
-            if image.mode in ("RGBA", "P"):
-                image = image.convert("RGB")
-        elif output_format == "png":
-            output_format = "png"
-        else:
-            output_format = "jpeg"
-            if image.mode in ("RGBA", "P"):
-                image = image.convert("RGB")
+        # 1ファイルの場合は直接ダウンロード
+        if len(files) == 1:
+            f = files[0]
+            try:
+                output, extension = process_image(
+                    f.stream, quality, target_width, target_dpi, output_format
+                )
+            except Exception:
+                flash("画像の読み込みに失敗しました。", "error")
+                return redirect(url_for("index"))
 
-        output = io.BytesIO()
-        save_kwargs = {}
-        if target_dpi:
-            save_kwargs["dpi"] = (target_dpi, target_dpi)
+            base_name, _ = os.path.splitext(f.filename)
+            download_name = f"{base_name}{extension}"
+            return send_file(
+                output,
+                as_attachment=True,
+                download_name=download_name,
+                mimetype=f"image/{output_format}",
+            )
 
-        if output_format == "jpeg":
-            save_kwargs.update({"format": "JPEG", "quality": quality, "optimize": True})
-            extension = ".jpg"
-        elif output_format == "webp":
-            save_kwargs.update({"format": "WEBP", "quality": quality, "method": 6})
-            extension = ".webp"
-        else:
-            compress_level = int(round((100 - quality) / 100 * 9))
-            save_kwargs.update({"format": "PNG", "optimize": True, "compress_level": compress_level})
-            extension = ".png"
+        # 複数ファイルの場合はZIPでダウンロード
+        zip_buffer = io.BytesIO()
+        used_names = {}
+        errors = []
 
-        image.save(output, **save_kwargs)
-        output.seek(0)
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in files:
+                try:
+                    output, extension = process_image(
+                        f.stream, quality, target_width, target_dpi, output_format
+                    )
+                except Exception:
+                    errors.append(f.filename)
+                    continue
 
-        base_name, _ = os.path.splitext(original_filename)
-        download_name = f"{base_name}{extension}"
+                base_name, _ = os.path.splitext(f.filename)
+                name = f"{base_name}{extension}"
 
+                # 同名ファイルの重複回避
+                if name in used_names:
+                    used_names[name] += 1
+                    name = f"{base_name}_{used_names[name]}{extension}"
+                else:
+                    used_names[name] = 0
+
+                zf.writestr(name, output.read())
+
+        if errors:
+            flash(f"一部の画像を処理できませんでした: {', '.join(errors)}", "error")
+
+        zip_buffer.seek(0)
         return send_file(
-            output,
+            zip_buffer,
             as_attachment=True,
-            download_name=download_name,
-            mimetype=f"image/{output_format}",
+            download_name="images.zip",
+            mimetype="application/zip",
         )
 
     return render_template("index.html")
